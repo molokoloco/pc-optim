@@ -1,0 +1,11 @@
+# Sorties runtime du diagnostic (générées dans le cwd, jamais commitées)
+pc-optim-out/
+pc-optim-*.md
+pc-optim-*.pdf
+pc-optim-*.html
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+*.log
+node_modules/

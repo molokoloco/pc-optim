@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>{{TITLE}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Squada+One&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 1.5cm 1.5cm 1.4cm 1.5cm; }
+  :root {
+    --primary: #1E91D4;
+    --accent: #5A4095;
+    --secondary: #F5FF00;
+    --dark: #2A2746;
+    --dark-text: #464169;
+    --muted: #999999;
+    --light: #F2F5F7;
+    --lightblue: #9ED5E1;
+    --green: #2BAE66;
+    --yellow: #E8B500;
+    --red: #D7263D;
+    --grad: linear-gradient(135deg, #1E91D4 0%, #5A4095 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Poppins', Arial, sans-serif;
+    font-size: 9.5pt;
+    color: var(--dark-text);
+    line-height: 1.45;
+    background: #fff;
+  }
+  h1, h2, h3, h4, h5, h6, .brand { font-family: 'Squada One', sans-serif; line-height: 1.2; letter-spacing: 0.3px; }
+
+  .topbar {
+    background: var(--grad);
+    color: #fff;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .topbar .brand { font-size: 20px; color: #fff; letter-spacing: 1px; }
+  .topbar .brand .accent { color: var(--secondary); }
+  .topbar .tagline { font-size: 8.5pt; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+  .topbar .meta { text-align: right; font-size: 8pt; color: rgba(255,255,255,0.85); }
+  .topbar .meta strong { color: var(--secondary); font-size: 9pt; }
+
+  .report h1 { font-size: 19pt; color: var(--accent); margin: 10px 0 4px; }
+  .report h2 { font-size: 14pt; color: var(--accent); margin: 14px 0 6px; padding: 6px 10px; background: var(--light); border-left: 4px solid var(--accent); border-radius: 0 4px 4px 0; }
+  .report h3 { font-size: 11.5pt; color: var(--primary); margin: 10px 0 5px; }
+  .report h4 { font-size: 10pt; color: var(--dark-text); margin: 8px 0 4px; }
+  .report p { margin: 0 0 6px; }
+  .report ul, .report ol { margin: 4px 0 8px 18px; }
+  .report li { margin-bottom: 2px; }
+  .report strong { color: var(--dark-text); }
+  .report em { color: var(--accent); font-style: italic; }
+  .report code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8.5pt;
+    background: var(--light);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+  .report pre {
+    background: var(--light);
+    border-left: 3px solid var(--primary);
+    padding: 8px 10px;
+    margin: 6px 0 10px;
+    border-radius: 0 4px 4px 0;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8pt;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .report blockquote {
+    border-left: 3px solid var(--lightblue);
+    padding: 4px 10px;
+    margin: 6px 0 10px;
+    color: var(--muted);
+    font-style: italic;
+    background: #fafbfc;
+  }
+  .report hr {
+    border: 0;
+    border-top: 1px solid #e3e6ee;
+    margin: 14px 0;
+  }
+  .report table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 6px 0 10px;
+    font-size: 8.5pt;
+  }
+  .report th, .report td {
+    border: 1px solid #dde2ea;
+    padding: 5px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .report th {
+    background: var(--light);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 8.5pt;
+  }
+  .report tr:nth-child(even) td { background: #fafbfc; }
+  .report a { color: var(--primary); text-decoration: none; }
+
+  .footer {
+    margin-top: 18px;
+    padding-top: 8px;
+    border-top: 1px solid #e3e6ee;
+    font-size: 7.5pt;
+    color: var(--muted);
+    text-align: center;
+    font-style: italic;
+  }
+  .footer .brand-mini { font-family: 'Squada One', sans-serif; color: var(--accent); font-size: 9pt; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div>
+      <div class="brand">JulienWeb<span class="accent">.fr</span> ツ</div>
+      <div class="tagline">Diagnostic PC — read-only</div>
+    </div>
+    <div class="meta">
+      Rapport généré<br>
+      <strong>{{DATE}}</strong>
+    </div>
+  </div>
+
+  <div class="report">
+  {{{BODY_HTML}}}
+  </div>
+
+  <div class="footer">
+    <span class="brand-mini">JulienWeb.fr</span> · skill <code>/pc-optim</code> · {{DATE}}
+  </div>
+
+</body>
+</html>

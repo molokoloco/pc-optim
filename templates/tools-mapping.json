@@ -1,0 +1,96 @@
+{
+  "_doc": "Mapping tool_hint -> outil concret installé chez Julien. Utilisé par _build_report.ps1 pour la section Quick wins.",
+  "_source_article": "Julienweb.fr/content/articles-publies/2024-12-02_nettoyer-optimiser-et-mettre-a-jour-votre-windows-10-11.md",
+  "tools": {
+    "spacesniffer": {
+      "name": "SpaceSniffer",
+      "url": "https://www.fosshub.com/SpaceSniffer.html",
+      "purpose": "Explorer visuellement un dossier lourd identifié",
+      "categories": ["disk_usage", "top_folders"]
+    },
+    "ccleaner": {
+      "name": "CCleaner",
+      "url": "https://www.ccleaner.com/fr-fr/ccleaner/download",
+      "purpose": "Nettoyer caches navigateurs, cookies, registre, gérer démarrage",
+      "categories": ["temp", "browser_cache"]
+    },
+    "7zip": {
+      "name": "7-Zip",
+      "url": "https://www.7-zip.org/",
+      "purpose": "Recompresser ou extraire une archive lourde",
+      "categories": ["archive"]
+    },
+    "wingetui": {
+      "name": "WingetUI / UpdateHub",
+      "url": "https://github.com/marticliment/WingetUI",
+      "purpose": "Mettre à jour ou désinstaller proprement les apps listées",
+      "categories": ["apps_installed", "app_unused", "app_outdated"]
+    },
+    "memorycleaner": {
+      "name": "Windows Memory Cleaner",
+      "url": "https://github.com/IgorMundstein/WinMemoryCleaner",
+      "purpose": "Libérer la RAM après gros build / VM",
+      "categories": ["ram"]
+    },
+    "oem": {
+      "name": "Utilitaire fabricant (Dell SupportAssist / HP / Lenovo Vantage / MyASUS / Acer Care / MSI Dragon Center / Razer Synapse / Surface Uptime)",
+      "url": "",
+      "purpose": "Mettre à jour pilotes, BIOS, diagnostics matériels",
+      "categories": ["driver", "bios"]
+    },
+    "windows-builtin": {
+      "name": "Nettoyage de disque + Storage Sense (Assistant de stockage)",
+      "url": "ms-settings:storagesense",
+      "purpose": "Nettoyer Windows Update files, miniatures, corbeille en natif",
+      "categories": ["temp", "recycle_bin", "windows_update_files"]
+    },
+    "manual": {
+      "name": "Action manuelle (Explorer / Settings)",
+      "url": "",
+      "purpose": "Tri ponctuel ou réglage spécifique",
+      "categories": ["duplicate", "ai_model", "node_modules", "package_cache"]
+    },
+    "ollama-cli": {
+      "name": "Ollama CLI",
+      "url": "https://ollama.com/",
+      "purpose": "ollama rm <model> pour supprimer proprement un modèle",
+      "categories": ["ai_model"]
+    },
+    "docker-cli": {
+      "name": "Docker CLI",
+      "url": "https://docs.docker.com/engine/reference/commandline/system_prune/",
+      "purpose": "docker system prune -a --volumes pour purger images/volumes orphelins",
+      "categories": ["docker_dangling"]
+    },
+    "dupeguru": {
+      "name": "dupeGuru",
+      "url": "https://dupeguru.voltaicideas.net/",
+      "purpose": "Certifier doublons (hash) avant suppression",
+      "categories": ["duplicate"]
+    }
+  },
+  "category_to_tool_default": {
+    "disk_usage": "spacesniffer",
+    "top_folders": "spacesniffer",
+    "temp": "ccleaner",
+    "recycle_bin": "windows-builtin",
+    "archive": "7zip",
+    "download": "manual",
+    "duplicate": "dupeguru",
+    "ai_model": "ollama-cli",
+    "package_cache": "manual",
+    "node_modules": "manual",
+    "docker_dangling": "docker-cli",
+    "app_unused": "wingetui",
+    "app_outdated": "wingetui",
+    "driver": "oem",
+    "bios": "oem",
+    "ram": "memorycleaner",
+    "browser_cache": "ccleaner"
+  },
+  "risk_levels": {
+    "green":  "🟢 sans risque — caches/temp régénérables",
+    "yellow": "🟡 à vérifier — archive, doublon, modèle IA",
+    "red":    "🔴 attention — fichier système ou app active"
+  }
+}
