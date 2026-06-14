@@ -60,6 +60,10 @@ Gain total estimé : 16.89 GB
 
 Chaque ligne porte un **code de risque** — 🟢 vide sans risque · 🟡 vérifie d'abord · 🔴 prudence — et l'**outil recommandé** (SpaceSniffer, CCleaner, 7-Zip, WingetUI, Memory Cleaner, utilitaire fabricant…).
 
+[![Aperçu d'un rapport pc-optim](examples/example-report.png)](examples/example-report.png)
+
+> 📄 Rapport d'exemple complet (anonymisé) : **[examples/example-report.md](examples/example-report.md)**
+
 ## Pourquoi pas de hash sur les doublons ?
 
 Un hash récursif sur un home Windows = 20-90 min. Pour 99 % des doublons utiles, comparer `(nom, taille)` suffit et c'est instantané. Le rapport remonte des **candidats** ; pour certifier avant suppression, passe [dupeGuru](https://dupeguru.voltaicideas.net/) ou AllDup sur le dossier identifié.
