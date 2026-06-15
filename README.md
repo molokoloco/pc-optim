@@ -81,7 +81,7 @@ Remplace les `.ps1` par leurs équivalents (`du -ah`, `find -size +`, `ss -tln`,
 
 ## À lire
 
-- 📝 **L'histoire derrière l'outil** : [J'ai transformé mon guide d'optimisation Windows en agent IA](https://julienweb.fr/) — Julienweb.fr
+- 📝 **L'histoire derrière l'outil** : [J'ai transformé mon guide d'optimisation Windows en agent IA](https://julienweb.fr/cours-formations/pc-optim-diagnostic-windows-ia-claude-code/10803/) — Julienweb.fr
 - 🧹 **Le guide manuel hub** : [Nettoyer, optimiser et mettre à jour votre Windows 10/11](https://julienweb.fr/cours-formations/nettoyer-optimiser-et-mettre-a-jour-votre-windows-10-11/3354/)
 
 ## Licence
