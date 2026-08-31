@@ -80,4 +80,4 @@ $output = [PSCustomObject]@{
     }
 }
 
-$output | ConvertTo-Json -Depth 8
+_Emit-Json $output -Depth 8

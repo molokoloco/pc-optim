@@ -4,6 +4,10 @@
 # Set-StrictMode désactivé volontairement (Get-ChildItem -EA SilentlyContinue retourne $null)
 
 $ErrorActionPreference = 'Continue'
+
+# Logs stderr en UTF-8 (sinon accents mojibake dans _scan_*.log). Per-process, read-only.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}
+
 $script:AccessDeniedCount = 0
 $script:OneDriveSkipped = 0
 
@@ -38,21 +42,29 @@ function _Get-FolderSize {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $total = [long]0
 
+    # NB : Get-ChildItem doit STREAMER (pipeline), pas être collecté dans une variable.
+    # Collecté, l'énumération complète se fait avant la 1re itération : sur un gros dossier
+    # elle dépasse déjà le deadline, on breake au 1er élément et on retourne 0 B — un dossier
+    # de 80 GB était silencieusement rapporté vide. Le do/while donne une cible au `break`.
+    $timedOut = $false
     try {
-        $items = Get-ChildItem -LiteralPath $Path -Recurse -File -Force `
-            -ErrorAction SilentlyContinue -ErrorVariable +scanErrors
-        foreach ($item in $items) {
-            if ((Get-Date) -gt $deadline) {
-                _Warn "_Get-FolderSize timeout après ${TimeoutSeconds}s sur $Path"
-                break
-            }
-            # Skip placeholder OneDrive / Google Drive Stream
-            $attrs = [string]$item.Attributes
-            if ($attrs -match 'Offline|RecallOnOpen|RecallOnDataAccess') {
-                $script:OneDriveSkipped++
-                continue
-            }
-            $total += $item.Length
+        do {
+            Get-ChildItem -LiteralPath $Path -Recurse -File -Force `
+                -ErrorAction SilentlyContinue -ErrorVariable +scanErrors |
+                ForEach-Object {
+                    if ((Get-Date) -gt $deadline) { $timedOut = $true; break }
+                    # Skip placeholder OneDrive / Google Drive Stream
+                    $attrs = [string]$_.Attributes
+                    if ($attrs -match 'Offline|RecallOnOpen|RecallOnDataAccess') {
+                        $script:OneDriveSkipped++
+                        return
+                    }
+                    $total += $_.Length
+                }
+        } while ($false)
+        if ($timedOut) {
+            _Warn ("_Get-FolderSize timeout apres {0}s sur {1} — total PARTIEL ({2})" `
+                -f $TimeoutSeconds, $Path, (_Format-Size $total))
         }
         if ($scanErrors) {
             $denied = @($scanErrors | Where-Object { $_.Exception -is [System.UnauthorizedAccessException] }).Count
@@ -73,7 +85,8 @@ function _Get-TopFolders {
     param(
         [Parameter(Mandatory)][string]$ParentPath,
         [int]$TopN = 20,
-        [int]$PerFolderTimeoutSeconds = 60
+        # AppData dépasse largement 60s sur un profil chargé. Surchargeable : PC_OPTIM_FOLDER_TIMEOUT
+        [int]$PerFolderTimeoutSeconds = $(if ($env:PC_OPTIM_FOLDER_TIMEOUT) { [int]$env:PC_OPTIM_FOLDER_TIMEOUT } else { 240 })
     )
 
     if (-not (Test-Path -LiteralPath $ParentPath)) { return @() }
@@ -215,6 +228,23 @@ function _Get-DriveInfo {
             filesystem = ''; volume_name = ''
         }
     }
+}
+
+function _Emit-Json {
+    <#
+    .SYNOPSIS
+        Sérialise en JSON puis échappe tout non-ASCII en \uXXXX avant d'écrire sur stdout.
+    .DESCRIPTION
+        La redirection bash `> fichier.json` passe par la codepage console : un caractère
+        hors codepage est translittéré silencieusement. Un nom de fichier contenant
+        U+FF02 (guillemet pleine chasse) devient un `"` droit non échappé → JSON invalide.
+        Sortie ASCII pure = immunisée à la codepage.
+    #>
+    param([Parameter(Mandatory)]$InputObject, [int]$Depth = 8)
+    $json = $InputObject | ConvertTo-Json -Depth $Depth
+    [regex]::Replace($json, '[^\x20-\x7E\r\n\t]', {
+        param($m) '\u{0:x4}' -f [int][char]$m.Value
+    })
 }
 
 function _Report-ScanStats {

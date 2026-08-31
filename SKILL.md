@@ -1,6 +1,6 @@
 ---
 name: pc-optim
-version: 1.0.0
+version: 1.1.0
 description: Diagnostic read-only PC Windows — disk (C:\), modèles IA, caches dev, doublons, apps, réseau & sécurité. 6 scans PowerShell + rapport markdown. Mapping findings → outils Julien (SpaceSniffer/CCleaner/7-Zip/WingetUI/Memory Cleaner/OEM). Aucune écriture système. Trigger /pc-optim.
 trigger: /pc-optim
 allowed-tools: Read, Write, Bash, Grep, Glob
@@ -137,6 +137,10 @@ SKIP_DUP=1 SKIP_NET=1 bash ~/.claude/skills/pc-optim/pc-optim.sh
 
 Top N configurable par scan via `PC_OPTIM_TOPN=100` (défaut : 50).
 
+Timeout de mesure par dossier via `PC_OPTIM_FOLDER_TIMEOUT=600` (défaut : 240 s). À monter sur un profil
+chargé : `AppData` seul dépasse 120 s. Au-delà du délai, le total du dossier est **partiel** — le scan le
+signale en stderr au lieu de rendre un chiffre faux silencieusement.
+
 ### Sortie complète
 
 ```
@@ -161,6 +165,7 @@ Top N configurable par scan via `PC_OPTIM_TOPN=100` (défaut : 50).
 - **`Get-NetTCPConnection`** vide si lancé depuis session non-interactive (SSH headless, scheduled task SYSTEM). Hors cas Julien mais documenté.
 - **`winget list`** : flag `--accept-source-agreements` obligatoire ; fallback registry-seul si winget absent ou trop lent. La détection « peu utilisée » via UserAssist échoue sur les apps lancées seulement via raccourci épinglé Start (limite Windows).
 - **Durée scan doublons** : limitée volontairement aux 5 dossiers utilisateur principaux (pas tout `$env:USERPROFILE`) sinon 5+ min sur des Documents volumineux.
+- **Sous-comptage sur `AppData` (non résolu, 2026-08-31)** : `Get-ChildItem -Recurse` abandonne toute une branche au premier `AccessDenied` au lieu de continuer. Sur un profil chargé, `AppData` est ressorti à **28,9 GB** contre **82,3 GB** réels (14 refus, surtout `Local\Packages` UWP et `Local\Docker`). Sur un sous-arbre sans refus le helper est exact au byte près. **Recouper toute grosse valeur** avec `robocopy <dir> C:\__nx__ /L /S /NJH /BYTES /NC /NDL /XJ /R:0 /W:0`. Attention : robocopy compte les placeholders Drive/OneDrive à leur taille logique — il surestime là où `_Get-FolderSize` les exclut.
 - **Admin** : non requis pour 90% des scans. Sans admin, certains `OwningProcess` n'exposent pas leur `Path` complet → le rapport affiche `?` à la place. `_Test-IsAdmin` warn en stderr si non-admin, scan continue dégradé.
 
 ---

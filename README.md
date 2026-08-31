@@ -42,7 +42,7 @@ SKIP_UPGRADE=1 bash ~/pc-optim/pc-optim.sh
 # → pc-optim-out/           (6 JSON + logs)
 ```
 
-Flags : `SKIP_DISK SKIP_AI SKIP_DEV SKIP_DUP SKIP_APP SKIP_NET` (sauter un scan), `SKIP_PDF SKIP_UPGRADE SKIP_OPEN`, `PC_OPTIM_TOPN=100`.
+Flags : `SKIP_DISK SKIP_AI SKIP_DEV SKIP_DUP SKIP_APP SKIP_NET` (sauter un scan), `SKIP_PDF SKIP_UPGRADE SKIP_OPEN`, `PC_OPTIM_TOPN=100`, `PC_OPTIM_FOLDER_TIMEOUT=600` (timeout de mesure par dossier, défaut 240 s — à monter sur un profil chargé).
 
 ## Exemple de sortie (extrait réel)
 

@@ -1,8 +1,11 @@
 # Sorties runtime du diagnostic (générées dans le cwd, jamais commitées)
+# NB : ancré sur la racine + daté. Le motif large `pc-optim-*.md` matchait aussi
+# templates/PC-OPTIM-template.md (git est case-insensitive sous Windows) → le
+# template n'a jamais été commité et disparaissait au clone.
 pc-optim-out/
-pc-optim-*.md
-pc-optim-*.pdf
-pc-optim-*.html
+/pc-optim-20*.md
+/pc-optim-20*.pdf
+/pc-optim-20*.html
 
 # OS / éditeurs
 .DS_Store
