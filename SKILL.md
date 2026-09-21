@@ -1,6 +1,6 @@
 ---
 name: pc-optim
-version: 1.1.0
+version: 1.1.1
 description: Diagnostic read-only PC Windows — disk (C:\), modèles IA, caches dev, doublons, apps, réseau & sécurité. 6 scans PowerShell + rapport markdown. Mapping findings → outils Julien (SpaceSniffer/CCleaner/7-Zip/WingetUI/Memory Cleaner/OEM). Aucune écriture système. Trigger /pc-optim.
 trigger: /pc-optim
 allowed-tools: Read, Write, Bash, Grep, Glob
@@ -76,7 +76,7 @@ pc-optim.sh (Bash MSYS / Git-Bash)
 |---|---|
 | **Disk** | `$env:USERPROFILE`, `C:\Windows\Temp`, `C:\Windows\SoftwareDistribution\Download`, `C:\Windows\Installer`, `C:\$Recycle.Bin`, `$env:TEMP`, `$env:LOCALAPPDATA\Temp`, archives `.zip/.rar/.7z/.iso` > 500 MB |
 | **AI models** | `$env:USERPROFILE\.ollama\models`, `$env:USERPROFILE\.cache\huggingface`, `$env:USERPROFILE\.lmstudio`, `$env:LOCALAPPDATA\nomic.ai\GPT4All`, `$env:USERPROFILE\stable-diffusion-webui\models`, `$env:USERPROFILE\ComfyUI\models` + fichiers `.gguf/.safetensors/.bin/.ckpt` > 1 GB |
-| **Dev caches** | `$env:APPDATA\npm-cache`, `$env:LOCALAPPDATA\pip\Cache`, `$env:LOCALAPPDATA\Yarn\Cache`, `$env:LOCALAPPDATA\pnpm`, `$env:USERPROFILE\.cargo`, `$env:USERPROFILE\.gradle`, `$env:USERPROFILE\.m2`, `$env:USERPROFILE\go`, `$env:APPDATA\Code\Cache*`, `$env:LOCALAPPDATA\JetBrains`, `docker system df --format json` |
+| **Dev caches** | `$env:LOCALAPPDATA\npm-cache` + `$env:APPDATA\npm-cache` (les deux testés), `$env:LOCALAPPDATA\pip\Cache`, `$env:LOCALAPPDATA\Yarn\Cache`, `$env:LOCALAPPDATA\pnpm`, `$env:USERPROFILE\.cargo`, `$env:USERPROFILE\.gradle`, `$env:USERPROFILE\.m2`, `$env:USERPROFILE\go`, `$env:APPDATA\Code\Cache*`, `$env:LOCALAPPDATA\JetBrains`, `docker system df --format json` ; si le daemon ne répond pas : taille de `$env:LOCALAPPDATA\Docker\wsl` (information, hors gain) |
 | **Duplicates** | `$env:USERPROFILE\Downloads`, `Documents`, `Desktop`, `Pictures`, `Videos` — fichiers > 10 MB groupés par `(Name, Length)` |
 | **Apps** | `HKLM\…\Uninstall\*` (32 + 64), `HKCU\…\Uninstall\*`, `Get-AppxPackage`, `winget list --accept-source-agreements`, dernière utilisation via `UserAssist` ROT13 |
 | **Network** | `Get-DnsClientServerAddress`, `Get-VpnConnection`, `netsh winhttp show proxy`, `Get-NetTCPConnection -State Listen`, `Get-MpPreference`, `Get-MpComputerStatus`, `Get-NetFirewallProfile`, `Test-NetConnection 1.1.1.1 -InformationLevel Detailed` |
@@ -166,6 +166,7 @@ signale en stderr au lieu de rendre un chiffre faux silencieusement.
 - **`winget list`** : flag `--accept-source-agreements` obligatoire ; fallback registry-seul si winget absent ou trop lent. La détection « peu utilisée » via UserAssist échoue sur les apps lancées seulement via raccourci épinglé Start (limite Windows).
 - **Durée scan doublons** : limitée volontairement aux 5 dossiers utilisateur principaux (pas tout `$env:USERPROFILE`) sinon 5+ min sur des Documents volumineux.
 - **Sous-comptage sur `AppData` (non résolu, 2026-08-31)** : `Get-ChildItem -Recurse` abandonne toute une branche au premier `AccessDenied` au lieu de continuer. Sur un profil chargé, `AppData` est ressorti à **28,9 GB** contre **82,3 GB** réels (14 refus, surtout `Local\Packages` UWP et `Local\Docker`). Sur un sous-arbre sans refus le helper est exact au byte près. **Recouper toute grosse valeur** avec `robocopy <dir> C:\__nx__ /L /S /NJH /BYTES /NC /NDL /XJ /R:0 /W:0`. Attention : robocopy compte les placeholders Drive/OneDrive à leur taille logique — il surestime là où `_Get-FolderSize` les exclut.
+- **Gain potentiel = 🟢 + 🟡 seulement.** Une zone 🔴 (`C:\Windows\Installer`) est listée en §1.3 mais n'entre jamais dans le gain. Les zones temp sont dédupliquées par chemin résolu : `$env:TEMP` et `$env:LOCALAPPDATA\Temp` sont le même dossier sur un Windows standard.
 - **Admin** : non requis pour 90% des scans. Sans admin, certains `OwningProcess` n'exposent pas leur `Path` complet → le rapport affiche `?` à la place. `_Test-IsAdmin` warn en stderr si non-admin, scan continue dégradé.
 
 ---

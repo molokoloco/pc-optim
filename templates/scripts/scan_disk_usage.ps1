@@ -23,14 +23,24 @@ $tempZones = @(
     @{ label = 'LocalAppData Temp';           path = "$env:LOCALAPPDATA\Temp";                             risk = 'green';  tool = 'ccleaner' }
     @{ label = 'Recycle Bin';                 path = 'C:\$Recycle.Bin';                                    risk = 'green';  tool = 'windows-builtin' }
 )
-$tempFindings = foreach ($z in $tempZones) {
-    $size = _Get-FolderSize -Path $z.path -TimeoutSeconds 60
+# $env:TEMP et $env:LOCALAPPDATA\Temp pointent en général sur le MÊME dossier : dédup par
+# chemin résolu, sinon il est mesuré et compté deux fois dans le gain.
+$seenTemp = @{}
+$tempFindings = @(foreach ($z in $tempZones) {
+    if (-not $z.path) { continue }
+    $real = _Resolve-LongPath $z.path
+    if ($seenTemp.ContainsKey($real.ToLowerInvariant())) { continue }
+    $seenTemp[$real.ToLowerInvariant()] = $true
+    $size = _Get-FolderSize -Path $real -TimeoutSeconds 60
     if ($size -gt 0) {
-        _New-Finding -Category 'temp' -Label $z.label -Path $z.path -SizeBytes $size `
-            -Risk $z.risk -ToolHint $z.tool `
-            -Recommendation ("Récupérable {0}" -f (_Format-Size $size))
+        $reco = if ($z.risk -eq 'red') { "Information seule — ne pas vider à la main, hors gain potentiel" }
+                else { "Récupérable {0}" -f (_Format-Size $size) }
+        _New-Finding -Category 'temp' -Label $z.label -Path $real -SizeBytes $size `
+            -Risk $z.risk -ToolHint $z.tool -Recommendation $reco
     }
-}
+})
+# Une zone 🔴 (C:\Windows\Installer) est listée mais n'entre JAMAIS dans le gain potentiel.
+$tempRecoverable = @($tempFindings | Where-Object { $_.risk -ne 'red' })
 
 _Write-Phase "scan_disk_usage : archives > 500 MB (dossiers de stockage utilisateur)"
 $archiveExts = '*.zip','*.rar','*.7z','*.iso','*.tar','*.tar.gz','*.tgz','*.dmg','*.vhd','*.vhdx'
@@ -52,11 +62,11 @@ $archives = foreach ($zone in $archiveZones) {
             }
     }
 }
-$archiveFindings = $archives | Sort-Object Length -Descending | Select-Object -First $TopN | ForEach-Object {
+$archiveFindings = @($archives | Sort-Object Length -Descending | Select-Object -First $TopN | ForEach-Object {
     _New-Finding -Category 'archive' -Label $_.Extension.TrimStart('.') -Path $_.FullName `
         -SizeBytes $_.Length -Risk 'yellow' -ToolHint '7zip' `
         -Recommendation "Archive lourde — vérifier si encore utile, sinon extraire ou supprimer"
-}
+})
 
 _Report-ScanStats
 
@@ -68,7 +78,8 @@ $output = [PSCustomObject]@{
     temp_zones  = $tempFindings
     archives    = $archiveFindings
     totals      = [PSCustomObject]@{
-        recoverable_temp_gb = [math]::Round((($tempFindings | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
+        recoverable_temp_gb = [math]::Round((($tempRecoverable | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
+        manual_review_gb    = [math]::Round((($tempFindings | Where-Object { $_.risk -eq 'red' } | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
         archives_count      = ($archiveFindings | Measure-Object).Count
         archives_total_gb   = [math]::Round((($archiveFindings | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
     }

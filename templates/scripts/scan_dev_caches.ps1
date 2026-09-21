@@ -9,6 +9,8 @@ param(
 _Write-Phase "scan_dev_caches : package managers"
 
 $caches = @(
+    # npm >= 7 sous Windows : %LOCALAPPDATA%\npm-cache. Anciennes versions : %APPDATA%\npm-cache. On teste les deux.
+    @{ tool = 'npm';         path = "$env:LOCALAPPDATA\npm-cache";         recommendation = "npm cache clean --force"; risk = 'green' }
     @{ tool = 'npm';         path = "$env:APPDATA\npm-cache";              recommendation = "npm cache clean --force"; risk = 'green' }
     @{ tool = 'pnpm';        path = "$env:LOCALAPPDATA\pnpm-cache";        recommendation = "pnpm store prune"; risk = 'green' }
     @{ tool = 'pnpm-store';  path = "$env:LOCALAPPDATA\pnpm\store";        recommendation = "pnpm store prune"; risk = 'green' }
@@ -27,8 +29,12 @@ $caches = @(
     @{ tool = 'puppeteer';   path = "$env:USERPROFILE\.cache\puppeteer";   recommendation = "Cache chromium Puppeteer — réinstall sur prochain npm i"; risk = 'green' }
 )
 
-$cacheFindings = foreach ($c in $caches) {
+$seenCache = @{}
+$cacheFindings = @(foreach ($c in $caches) {
     if (-not (Test-Path -LiteralPath $c.path)) { continue }
+    $key = (_Resolve-LongPath $c.path).ToLowerInvariant()
+    if ($seenCache.ContainsKey($key)) { continue }
+    $seenCache[$key] = $true
     _Write-Phase ("  - {0}" -f $c.tool)
     $size = _Get-FolderSize -Path $c.path -TimeoutSeconds 45
     if ($size -gt 50MB) {
@@ -36,25 +42,44 @@ $cacheFindings = foreach ($c in $caches) {
             -Risk $c.risk -ToolHint 'manual' `
             -Recommendation $c.recommendation
     }
-}
+})
 
 _Write-Phase "scan_dev_caches : Docker (si présent)"
-$docker = [PSCustomObject]@{ available = $false }
-if (Get-Command docker -ErrorAction SilentlyContinue) {
+# installed = Docker présent sur la machine ; available = `docker system df` a répondu.
+# Daemon arrêté (ou CLI hors PATH) : df échoue, mais le disque virtuel WSL pèse quand même —
+# on le mesure, sinon plusieurs GB passent pour « Docker non détecté ».
+$dockerCli     = [bool](Get-Command docker -ErrorAction SilentlyContinue)
+$dockerDataDir = "$env:LOCALAPPDATA\Docker"
+$dockerWslDir  = "$dockerDataDir\wsl"
+$dockerInstalled = $dockerCli -or (Test-Path -LiteralPath "$env:ProgramFiles\Docker\Docker") -or (Test-Path -LiteralPath $dockerDataDir)
+$dockerDf = @()
+if ($dockerCli) {
     try {
         $dfRaw = & docker system df --format '{{json .}}' 2>$null
         if ($LASTEXITCODE -eq 0 -and $dfRaw) {
-            $entries = $dfRaw | Where-Object { $_ } | ForEach-Object {
+            $dockerDf = @($dfRaw | Where-Object { $_ } | ForEach-Object {
                 try { $_ | ConvertFrom-Json } catch { $null }
-            } | Where-Object { $_ -ne $null }
-            $docker = [PSCustomObject]@{
-                available = $true
-                df        = @($entries)
-            }
+            } | Where-Object { $_ -ne $null })
         }
     } catch {
         _Warn "docker system df erreur : $_"
     }
+}
+$dockerWslBytes = [long]0
+if ($dockerInstalled -and (Test-Path -LiteralPath $dockerWslDir)) {
+    $dockerWslBytes = _Get-FolderSize -Path $dockerWslDir -TimeoutSeconds 45
+}
+$docker = [PSCustomObject]@{
+    installed      = $dockerInstalled
+    available      = ($dockerDf.Count -gt 0)
+    df             = $dockerDf
+    wsl_path       = if ($dockerWslBytes -gt 0) { $dockerWslDir } else { $null }
+    wsl_size_bytes = $dockerWslBytes
+    wsl_size_human = _Format-Size $dockerWslBytes
+    wsl_size_gb    = _To-GB $dockerWslBytes
+}
+if ($dockerInstalled -and -not $docker.available) {
+    _Warn ("Docker installé mais 'docker system df' indisponible (daemon arrêté ?) — disque WSL mesuré : {0}" -f $docker.wsl_size_human)
 }
 
 _Write-Phase "scan_dev_caches : node_modules orphelins (> 6 mois, > 100 MB)"
@@ -79,7 +104,7 @@ foreach ($root in $searchRoots) {
         } catch { continue }
     }
 }
-$nodeModulesFindings = $nodeModulesFindings | Sort-Object size_bytes -Descending | Select-Object -First $TopN
+$nodeModulesFindings = @($nodeModulesFindings | Sort-Object size_bytes -Descending | Select-Object -First $TopN)
 
 _Report-ScanStats
 

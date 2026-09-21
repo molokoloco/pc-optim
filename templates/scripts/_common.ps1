@@ -77,6 +77,28 @@ function _Get-FolderSize {
     return $total
 }
 
+function _Resolve-LongPath {
+    <#
+    .SYNOPSIS
+        Chemin canonique pour dédupliquer : nom long (pas 8.3), casse du disque, sans `\` final.
+        $env:TEMP est souvent en 8.3 (C:\Users\MOLOK~1\...) alors que $env:LOCALAPPDATA\Temp
+        ne l'est pas — même dossier, deux écritures.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    try {
+        $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+        $root = [System.IO.Path]::GetPathRoot($full)
+        $resolved = $root.TrimEnd('\')
+        foreach ($seg in $full.Substring($root.Length).Split('\', [StringSplitOptions]::RemoveEmptyEntries)) {
+            $hit = [System.IO.Directory]::GetFileSystemEntries("$resolved\", $seg) | Select-Object -First 1
+            $resolved = if ($hit) { $hit.TrimEnd('\') } else { "$resolved\$seg" }
+        }
+        return $resolved
+    } catch {
+        return $Path.TrimEnd('\')
+    }
+}
+
 function _Get-TopFolders {
     <#
     .SYNOPSIS

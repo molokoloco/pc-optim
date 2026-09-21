@@ -1,5 +1,31 @@
 # Changelog — pc-optim
 
+## v1.1.1 — 2026-09-21
+
+Défauts de chiffrage et de rendu relevés sur le run du 2026-09-21. Le gain « §1 Espace disque »
+annonçait **8,03 GB** pour **3,4 GB** réellement récupérables.
+
+### Corrigé
+
+- **Dossier Temp compté deux fois.** `$env:TEMP` et `$env:LOCALAPPDATA\Temp` désignent le même
+  dossier (3,39 GB) : deux lignes en §1.3, deux fois dans le gain. Les zones temp sont dédupliquées
+  par chemin résolu (nouveau helper `_Resolve-LongPath` : nom long, `$env:TEMP` arrive souvent
+  en 8.3). Le builder déduplique aussi, donc un JSON produit par un scan antérieur est rendu juste.
+- **Zone 🔴 additionnée au gain.** `C:\Windows\Installer` (1,24 GB, risque `red` / `manual`)
+  entrait dans `recoverable_temp_gb`. Une zone 🔴 reste listée, avec une note, mais sort du gain ;
+  son poids est exposé à part dans `totals.manual_review_gb`.
+- **`npm-cache` non détecté.** Cherché dans `%APPDATA%\npm-cache` alors que npm >= 7 l'écrit dans
+  `%LOCALAPPDATA%\npm-cache` (0,5 GB manqués). Les deux emplacements sont testés.
+- **Docker « non détecté » avec Docker Desktop installé.** Le scan ne connaissait que
+  `docker system df`, qui échoue daemon arrêté. Il distingue désormais `installed` de `available`,
+  mesure `%LOCALAPPDATA%\Docker\wsl` (disque virtuel) et le rapport signale que le détail
+  récupérable n'a pas pu être lu. Ce poids reste **hors gain** : un `.vhdx` ne rétrécit pas sans
+  `docker system prune` + compactage.
+- **Lignes vides dans les tableaux §1.4, §2.2, §3.3.** Sous PowerShell 5.1 un pipeline vide se
+  sérialise en `{}`, relu comme un objet sans propriété → ligne `| (vide) |  | ⚪ |`. Les scans
+  émettent des tableaux (`@(...)`) et le builder filtre les objets vides (`Get-Items`) : le
+  message « _(aucun…)_ » prévu s'affiche.
+
 ## v1.1.0 — 2026-08-31
 
 Trois bugs qui rendaient le skill inutilisable en l'état, découverts en le lançant sur un

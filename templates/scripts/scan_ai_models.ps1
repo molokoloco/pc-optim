@@ -75,14 +75,14 @@ $orphans = foreach ($zone in $orphanZones) {
 
 # Exclure ceux déjà comptés dans les providers
 $knownPaths = $byProvider.Values | ForEach-Object { $_.path }
-$orphanFiles = $orphans | Where-Object {
+$orphanFiles = @($orphans | Where-Object {
     $f = $_.FullName
     -not ($knownPaths | Where-Object { $f.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) })
 } | Sort-Object Length -Descending | Select-Object -First $TopN | ForEach-Object {
     _New-Finding -Category 'ai_model' -Label 'orphan' -Path $_.FullName -SizeBytes $_.Length `
         -Risk 'yellow' -ToolHint 'manual' `
         -Recommendation "Modèle IA hors dossier provider connu — vérifier provenance avant suppression"
-}
+})
 
 _Report-ScanStats
 

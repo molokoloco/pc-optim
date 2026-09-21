@@ -9,7 +9,7 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
-$SKILL_VERSION = '1.1.0'
+$SKILL_VERSION = '1.1.1'
 
 # --- Helpers locaux ---
 function Load-Json {
@@ -56,6 +56,13 @@ function Esc-Md {
     return ($Text -replace '\|','\|' -replace '\r?\n',' ')
 }
 
+function Get-Items {
+    # Liste exploitable depuis un champ JSON. Sous PS 5.1 un pipeline vide se sérialise en `{}`,
+    # relu comme UN objet sans propriété → une ligne de tableau vide (`| `` |  | ⚪ |`).
+    param($Value)
+    return @($Value | Where-Object { $null -ne $_ -and @($_.PSObject.Properties).Count -gt 0 })
+}
+
 function Get-ToolName {
     param([string]$Hint)
     if (-not $Hint) { return '—' }
@@ -77,8 +84,26 @@ $net  = Load-Json 'scan_network_security'
 $mappingRaw = Get-Content -LiteralPath $Mapping -Raw -Encoding UTF8
 $mapping = $mappingRaw | ConvertFrom-Json
 
+# --- Listes normalisées (jamais d'objet vide) ---
+$diskArchives  = @(if ($disk) { Get-Items $disk.archives })
+$aiOrphans     = @(if ($ai)   { Get-Items $ai.orphan_files })
+$devCaches     = @(if ($dev)  { Get-Items $dev.package_caches })
+$devNodeMods   = @(if ($dev)  { Get-Items $dev.node_modules_orphans })
+
+# Zones temp : dédup par chemin (User Temp et LocalAppData\Temp = même dossier) et gain recalculé
+# ici, zones 🔴 exclues — un JSON produit par un scan < 1.1.1 est donc rendu juste lui aussi.
+$seenTempPaths = @{}
+$diskTempZones = @(if ($disk) {
+    Get-Items $disk.temp_zones | ForEach-Object {
+        $k = (_Resolve-LongPath ([string]$_.path)).ToLowerInvariant()
+        if (-not $seenTempPaths.ContainsKey($k)) { $seenTempPaths[$k] = $true; $_ }
+    }
+})
+$tempGainGb   = [math]::Round((($diskTempZones | Where-Object { $_.risk -ne 'red' } | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
+$tempManualGb = [math]::Round((($diskTempZones | Where-Object { $_.risk -eq 'red' } | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
+
 # --- Gains par section ---
-$gainDisk = if ($disk) { [double]$disk.totals.recoverable_temp_gb + [double]$disk.totals.archives_total_gb } else { 0 }
+$gainDisk = if ($disk) { [math]::Round($tempGainGb + [double]$disk.totals.archives_total_gb, 2) } else { 0 }
 $gainAi   = if ($ai)   { [double]$ai.totals.total_gb } else { 0 }
 $gainDev  = if ($dev)  { [double]$dev.totals.package_total_gb + [double]$dev.totals.node_modules_total_gb } else { 0 }
 $gainDup  = if ($dup)  { [double]$dup.totals.wasted_gb } else { 0 }
@@ -86,9 +111,9 @@ $gainTotal = [math]::Round($gainDisk + $gainAi + $gainDev + $gainDup, 2)
 
 # --- Top 3 actions ---
 $candidateActions = New-Object System.Collections.Generic.List[object]
-if ($disk -and $disk.totals.recoverable_temp_gb -gt 1) {
+if ($disk -and $tempGainGb -gt 1) {
     $candidateActions.Add([PSCustomObject]@{
-        gain = [double]$disk.totals.recoverable_temp_gb
+        gain = [double]$tempGainGb
         desc = "Vider Temp + SoftwareDistribution + corbeille"
         tool = (Get-ToolName 'windows-builtin')
     })
@@ -140,15 +165,18 @@ $diskTopMd = if ($disk -and $disk.top_folders) {
     "| Dossier | Taille |`n|---|---|`n" + ($rows -join "`n")
 } else { "_(scan disk skippé ou aucun dossier remontable)_" }
 
-$diskTempMd = if ($disk -and $disk.temp_zones) {
-    $rows = $disk.temp_zones | ForEach-Object {
+$diskTempMd = if ($diskTempZones.Count -gt 0) {
+    $rows = $diskTempZones | ForEach-Object {
         "| $(Risk-Icon $_.risk) | $($_.label) | ``$(Esc-Md $_.path)`` | $($_.size_human) | $(Get-ToolName $_.tool_hint) |"
     }
-    "| Risque | Zone | Chemin | Taille | Outil |`n|---|---|---|---|---|`n" + ($rows -join "`n")
+    $redNote = if ($tempManualGb -gt 0) {
+        "`n`n_Gain comptabilisé : **$tempGainGb GB**. Les zones 🔴 ($tempManualGb GB) sont listées pour information et n'entrent pas dans le gain._"
+    } else { '' }
+    "| Risque | Zone | Chemin | Taille | Outil |`n|---|---|---|---|---|`n" + ($rows -join "`n") + $redNote
 } else { "_(aucune zone temp à signaler)_" }
 
-$diskArchMd = if ($disk -and $disk.archives -and ($disk.archives | Measure-Object).Count -gt 0) {
-    $rows = $disk.archives | ForEach-Object {
+$diskArchMd = if ($diskArchives.Count -gt 0) {
+    $rows = $diskArchives | ForEach-Object {
         "| ``$(Esc-Md $_.path)`` | $($_.size_human) | $(Risk-Icon $_.risk) |"
     }
     "| Fichier | Taille | Risque |`n|---|---|---|`n" + ($rows -join "`n")
@@ -166,32 +194,38 @@ $aiProviderMd = if ($ai -and $ai.by_provider -and $ai.by_provider.PSObject.Prope
     "| Provider | Chemin | Taille | Top fichiers |`n|---|---|---|---|`n" + ($rows -join "`n")
 } else { "_(aucun provider IA local détecté)_" }
 
-$aiOrphanMd = if ($ai -and $ai.orphan_files -and ($ai.orphan_files | Measure-Object).Count -gt 0) {
-    $rows = $ai.orphan_files | ForEach-Object {
+$aiOrphanMd = if ($aiOrphans.Count -gt 0) {
+    $rows = $aiOrphans | ForEach-Object {
         "| ``$(Esc-Md $_.path)`` | $($_.size_human) | $(Risk-Icon $_.risk) |"
     }
     "| Fichier | Taille | Risque |`n|---|---|---|`n" + ($rows -join "`n")
 } else { "_(aucun fichier orphelin)_" }
 
 # --- §3 Dev caches ---
-$devCacheMd = if ($dev -and $dev.package_caches -and ($dev.package_caches | Measure-Object).Count -gt 0) {
-    $rows = $dev.package_caches | ForEach-Object {
+$devCacheMd = if ($devCaches.Count -gt 0) {
+    $rows = $devCaches | ForEach-Object {
         "| $(Risk-Icon $_.risk) | **$($_.label)** | ``$(Esc-Md $_.path)`` | $($_.size_human) | $(Esc-Md $_.recommendation) |"
     }
     "| Risque | Tool | Chemin | Taille | Commande |`n|---|---|---|---|---|`n" + ($rows -join "`n")
 } else { "_(aucun cache dev > 50 MB)_" }
 
-$dockerMd = if ($dev -and $dev.docker -and $dev.docker.available) {
-    if ($dev.docker.df) {
-        $rows = $dev.docker.df | ForEach-Object {
-            "| $($_.Type) | $($_.TotalCount) | $($_.Size) | $($_.Reclaimable) |"
-        }
-        "| Type | Total | Taille | Récupérable |`n|---|---|---|---|`n" + ($rows -join "`n") + "`n`n_Commande : `docker system prune -a --volumes`_"
-    } else { "_Docker installé, df vide_" }
+$dockerWslMd = if ($dev -and $dev.docker -and $dev.docker.wsl_size_bytes -gt 0) {
+    "Disque virtuel WSL : ``$(Esc-Md $dev.docker.wsl_path)`` — **$($dev.docker.wsl_size_human)** (hors gain : un ``.vhdx`` ne rétrécit pas tout seul, ``docker system prune`` puis compactage du disque)."
+} else { '' }
+$dockerDf = @(if ($dev -and $dev.docker) { Get-Items $dev.docker.df })
+$dockerMd = if ($dev -and $dev.docker -and $dev.docker.available -and $dockerDf.Count -gt 0) {
+    $rows = $dockerDf | ForEach-Object {
+        "| $($_.Type) | $($_.TotalCount) | $($_.Size) | $($_.Reclaimable) |"
+    }
+    "| Type | Total | Taille | Récupérable |`n|---|---|---|---|`n" + ($rows -join "`n") + "`n`n_Commande : `docker system prune -a --volumes`_" +
+        $(if ($dockerWslMd) { "`n`n$dockerWslMd" } else { '' })
+} elseif ($dev -and $dev.docker -and ($dev.docker.installed -or $dockerWslMd)) {
+    "🟡 **Docker installé, mais ``docker system df`` n'a pas répondu** (daemon arrêté ou CLI hors PATH) — le détail récupérable n'est pas mesuré. Démarrer Docker Desktop puis relancer le scan." +
+        $(if ($dockerWslMd) { "`n`n$dockerWslMd" } else { '' })
 } else { "_(Docker non détecté)_" }
 
-$nodeModulesMd = if ($dev -and $dev.node_modules_orphans -and ($dev.node_modules_orphans | Measure-Object).Count -gt 0) {
-    $rows = $dev.node_modules_orphans | ForEach-Object {
+$nodeModulesMd = if ($devNodeMods.Count -gt 0) {
+    $rows = $devNodeMods | ForEach-Object {
         "| ``$(Esc-Md $_.path)`` | $($_.size_human) | $(Esc-Md $_.recommendation) |"
     }
     "| Chemin | Taille | Recommandation |`n|---|---|---|`n" + ($rows -join "`n")
@@ -292,8 +326,8 @@ $netAdaptersMd = if ($net -and $net.adapters -and ($net.adapters | Measure-Objec
 
 # --- Quick wins table ---
 $quickWinsRows = New-Object System.Collections.Generic.List[string]
-if ($disk -and $disk.totals.recoverable_temp_gb -gt 0.5) {
-    $quickWinsRows.Add("| Temp système & cache Windows | 🟢 | ~$($disk.totals.recoverable_temp_gb) GB | $(Get-ToolName 'windows-builtin') | Paramètres → Système → Stockage → Fichiers temporaires |")
+if ($disk -and $tempGainGb -gt 0.5) {
+    $quickWinsRows.Add("| Temp système & cache Windows | 🟢 | ~$tempGainGb GB | $(Get-ToolName 'windows-builtin') | Paramètres → Système → Stockage → Fichiers temporaires |")
 }
 if ($disk -and $disk.totals.archives_count -gt 0) {
     $quickWinsRows.Add("| Archives lourdes ($($disk.totals.archives_count)) | 🟡 | ~$($disk.totals.archives_total_gb) GB | $(Get-ToolName '7zip') | Trier .zip/.rar/.iso dans Downloads |")
