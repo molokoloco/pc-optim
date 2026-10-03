@@ -56,7 +56,9 @@ const html = tpl
   .replace(/\{\{TITLE\}\}/g, escapeHtml(data.TITLE))
   .replace(/\{\{DATE\}\}/g, escapeHtml(data.DATE));
 
-fs.writeFileSync(htmlOut, html, 'utf8');
+// Garde d'en-tête (titre blanc sur fond foncé) : module global, optionnel hors de cette machine.
+const headerGuard = (() => { try { return require(require('path').join(require('os').homedir(), '.claude', 'scripts', '_header_guard.js')).injectHeaderGuard; } catch (e) { return h => h; } })();
+fs.writeFileSync(htmlOut, headerGuard(html), 'utf8');
 console.log(`HTML écrit : ${htmlOut}`);
 
 const chromeCandidates = [
