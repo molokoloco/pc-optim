@@ -1,8 +1,9 @@
-﻿# scan_disk_usage.ps1 — top dossiers C:\, temp système, archives volumineuses
+﻿# scan_disk_usage.ps1 — top dossiers C:\, temp système, archives volumineuses, gros fichiers racine, détail Temp/AppData
 # Sortie : JSON unique sur stdout
 # Read-only : aucune écriture, aucune modif système
 param(
-    [int]$TopN = 50
+    [int]$TopN = 50,
+    [int]$DetailTopN = 10
 )
 
 . "$PSScriptRoot\_common.ps1"
@@ -42,6 +43,38 @@ $tempFindings = @(foreach ($z in $tempZones) {
 # Une zone 🔴 (C:\Windows\Installer) est listée mais n'entre JAMAIS dans le gain potentiel.
 $tempRecoverable = @($tempFindings | Where-Object { $_.risk -ne 'red' })
 
+_Write-Phase "scan_disk_usage : fichiers > 100 MB à la racine de C:\"
+# pagefile.sys / hiberfil.sys / swapfile.sys : cachés + système, invisibles sans -Force.
+$rootFiles = @(Get-ChildItem -LiteralPath 'C:\' -Force -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Length -gt 100MB } | Sort-Object Length -Descending | ForEach-Object {
+        [PSCustomObject]@{
+            path       = $_.FullName
+            size_bytes = $_.Length
+            size_human = _Format-Size $_.Length
+            size_gb    = _To-GB $_.Length
+        }
+    })
+
+_Write-Phase "scan_disk_usage : détail Temp utilisateur (top $DetailTopN)"
+$tempTop = @(_Get-TopFolders -ParentPath (_Resolve-LongPath "$env:LOCALAPPDATA\Temp") -TopN $DetailTopN)
+
+_Write-Phase "scan_disk_usage : détail AppData (Local / LocalLow / Roaming, top $DetailTopN)"
+# Un niveau de plus sous AppData, sinon le plus gros poste du profil tient en une seule ligne.
+# Total = somme des sous-dossiers (fichiers posés à la racine du niveau non comptés).
+$appDataDetail = @(foreach ($sub in 'Local','LocalLow','Roaming') {
+    $p = "$env:USERPROFILE\AppData\$sub"
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    $all = @(_Get-TopFolders -ParentPath $p -TopN ([int]::MaxValue))
+    $sum = [long](($all | Measure-Object size_bytes -Sum).Sum)
+    [PSCustomObject]@{
+        path       = $p
+        size_bytes = $sum
+        size_human = _Format-Size $sum
+        size_gb    = _To-GB $sum
+        top        = @($all | Select-Object -First $DetailTopN)
+    }
+})
+
 _Write-Phase "scan_disk_usage : archives > 500 MB (dossiers de stockage utilisateur)"
 $archiveExts = '*.zip','*.rar','*.7z','*.iso','*.tar','*.tar.gz','*.tgz','*.dmg','*.vhd','*.vhdx'
 # Scan limité aux dossiers de stockage habituels (pas AppData, pas tout le profil)
@@ -77,7 +110,10 @@ $output = [PSCustomObject]@{
     top_folders = $userTop
     temp_zones  = $tempFindings
     archives    = $archiveFindings
-    totals      = [PSCustomObject]@{
+    root_files  = $rootFiles
+    temp_top    = $tempTop
+    appdata_detail = $appDataDetail
+    totals     = [PSCustomObject]@{
         recoverable_temp_gb = [math]::Round((($tempRecoverable | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
         manual_review_gb    = [math]::Round((($tempFindings | Where-Object { $_.risk -eq 'red' } | Measure-Object size_bytes -Sum).Sum / 1GB), 2)
         archives_count      = ($archiveFindings | Measure-Object).Count

@@ -51,6 +51,18 @@
 
 {{DISK_ARCHIVES}}
 
+### 1.5 Fichiers > 100 MB à la racine de C:\
+
+{{DISK_ROOT_FILES}}
+
+### 1.6 Détail du Temp utilisateur (top sous-dossiers)
+
+{{DISK_TEMP_TOP}}
+
+### 1.7 Détail `AppData` (Local / LocalLow / Roaming)
+
+{{DISK_APPDATA_DETAIL}}
+
 ---
 
 ## §2. Modèles IA locaux

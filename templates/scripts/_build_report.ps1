@@ -9,7 +9,11 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
-$SKILL_VERSION = '1.1.1'
+$SKILL_VERSION = '1.2.0'
+
+# Au-delà de ce taux de remplissage, C: ne sort jamais « propre » ni « rien d'urgent »,
+# quel que soit le gain identifié.
+$DISK_FULL_PCT = 90
 
 # --- Helpers locaux ---
 function Load-Json {
@@ -89,6 +93,13 @@ $diskArchives  = @(if ($disk) { Get-Items $disk.archives })
 $aiOrphans     = @(if ($ai)   { Get-Items $ai.orphan_files })
 $devCaches     = @(if ($dev)  { Get-Items $dev.package_caches })
 $devNodeMods   = @(if ($dev)  { Get-Items $dev.node_modules_orphans })
+$diskRootFiles = @(if ($disk) { Get-Items $disk.root_files })
+$diskTempTop   = @(if ($disk) { Get-Items $disk.temp_top })
+$diskAppData   = @(if ($disk) { Get-Items $disk.appdata_detail })
+
+$machine = if ($disk) { $disk.machine } else { _Get-MachineInfo }
+$driveInfo = if ($disk) { $disk.drive } else { _Get-DriveInfo -DriveLetter 'C' }
+$diskFull = [double]$driveInfo.used_pct -ge $DISK_FULL_PCT
 
 # Zones temp : dédup par chemin (User Temp et LocalAppData\Temp = même dossier) et gain recalculé
 # ici, zones 🔴 exclues — un JSON produit par un scan < 1.1.1 est donc rendu juste lui aussi.
@@ -153,8 +164,15 @@ $topActionsMd = if ($top3.Count -gt 0) {
         $i++
         "$i. **$($_.desc)** — gain ~$([math]::Round($_.gain,1)) GB · outil : *$($_.tool)*"
     }) -join "`n"
+} elseif ($diskFull) {
+    ''
 } else {
     "_Rien d'urgent à signaler._"
+}
+if ($diskFull) {
+    $topActionsMd = ("🔴 **Disque C: rempli à $($driveInfo.used_pct) % — $($driveInfo.free_gb) GB libres.** " +
+        "Le gain identifié ($gainTotal GB) ne dit rien de l'urgence : voir §1.5 à §1.7 (fichiers système à la racine, " +
+        "détail Temp et AppData), puis explorer C:\ avec *$(Get-ToolName 'spacesniffer')*.`n`n$topActionsMd").Trim()
 }
 
 # --- §1 Disk ---
@@ -181,6 +199,30 @@ $diskArchMd = if ($diskArchives.Count -gt 0) {
     }
     "| Fichier | Taille | Risque |`n|---|---|---|`n" + ($rows -join "`n")
 } else { "_(aucune archive > 500 MB)_" }
+
+$diskRootFilesMd = if ($diskRootFiles.Count -gt 0) {
+    $rows = $diskRootFiles | ForEach-Object {
+        "| ``$(Esc-Md $_.path)`` | $($_.size_human) |"
+    }
+    "| Fichier | Taille |`n|---|---|`n" + ($rows -join "`n") +
+        "`n`n_Hors gain : fichiers gérés par Windows. ``pagefile.sys`` se règle dans Paramètres système avancés → Mémoire virtuelle ; ``hiberfil.sys`` disparaît avec ``powercfg /h off`` (admin, désactive la veille prolongée)._"
+} else { "_(aucun fichier > 100 MB à la racine, ou scan antérieur à la v1.2.0)_" }
+
+$diskTempTopMd = if ($diskTempTop.Count -gt 0) {
+    $rows = $diskTempTop | ForEach-Object {
+        "| ``$(Esc-Md $_.path)`` | $($_.size_human) |"
+    }
+    "| Dossier | Taille |`n|---|---|`n" + ($rows -join "`n")
+} else { "_(Temp vide, ou scan antérieur à la v1.2.0)_" }
+
+$diskAppDataMd = if ($diskAppData.Count -gt 0) {
+    $rows = $diskAppData | ForEach-Object {
+        "| **``$(Esc-Md $_.path)``** | **$($_.size_human)** |"
+        Get-Items $_.top | ForEach-Object { "| ``$(Esc-Md $_.path)`` | $($_.size_human) |" }
+    }
+    "| Dossier | Taille |`n|---|---|`n" + ($rows -join "`n") +
+        "`n`n_Totaux = somme des sous-dossiers mesurés. Sous-comptage possible sur les branches protégées (UWP, Docker) : recouper avec ``robocopy /L``._"
+} else { "_(détail AppData non mesuré — scan antérieur à la v1.2.0)_" }
 
 # --- §2 AI ---
 $aiProviderMd = if ($ai -and $ai.by_provider -and $ai.by_provider.PSObject.Properties.Count -gt 0) {
@@ -353,9 +395,6 @@ $quickWinsMd = "| Finding | Risque | Gain | Outil | Action |`n|---|---|---|---|-
 _Write-Phase "build_report : substitution template"
 $tpl = Get-Content -LiteralPath $Template -Raw -Encoding UTF8
 
-$machine = if ($disk) { $disk.machine } else { _Get-MachineInfo }
-$driveInfo = if ($disk) { $disk.drive } else { _Get-DriveInfo -DriveLetter 'C' }
-
 $substitutions = @{
     '{{DATE}}'                = (Get-Date).ToString('yyyy-MM-dd')
     '{{SKILL_VERSION}}'       = $SKILL_VERSION
@@ -377,7 +416,7 @@ $substitutions = @{
     '{{GAIN_DEV_GB}}'         = "$gainDev"
     '{{GAIN_DUP_GB}}'         = "$gainDup"
     '{{GAIN_TOTAL_GB}}'       = "$gainTotal"
-    '{{SCORE_DISK}}'          = Score-Section $gainDisk
+    '{{SCORE_DISK}}'          = if ($diskFull) { "🔴 disque plein ($($driveInfo.used_pct) %)" } else { Score-Section $gainDisk }
     '{{SCORE_AI}}'            = Score-Section $gainAi
     '{{SCORE_DEV}}'           = Score-Section $gainDev
     '{{SCORE_DUP}}'           = Score-Section $gainDup
@@ -387,6 +426,9 @@ $substitutions = @{
     '{{DISK_TOP_FOLDERS}}'    = $diskTopMd
     '{{DISK_TEMP_ZONES}}'     = $diskTempMd
     '{{DISK_ARCHIVES}}'       = $diskArchMd
+    '{{DISK_ROOT_FILES}}'     = $diskRootFilesMd
+    '{{DISK_TEMP_TOP}}'       = $diskTempTopMd
+    '{{DISK_APPDATA_DETAIL}}' = $diskAppDataMd
     '{{AI_BY_PROVIDER}}'      = $aiProviderMd
     '{{AI_ORPHANS}}'          = $aiOrphanMd
     '{{DEV_PACKAGE_CACHES}}'  = $devCacheMd

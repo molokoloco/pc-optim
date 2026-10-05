@@ -1,6 +1,6 @@
 ---
 name: pc-optim
-version: 1.1.1
+version: 1.2.0
 description: Diagnostic read-only PC Windows — disk (C:\), modèles IA, caches dev, doublons, apps, réseau & sécurité. 6 scans PowerShell + rapport markdown. Mapping findings → outils Julien (SpaceSniffer/CCleaner/7-Zip/WingetUI/Memory Cleaner/OEM). Aucune écriture système. Trigger /pc-optim.
 trigger: /pc-optim
 allowed-tools: Read, Write, Bash, Grep, Glob
@@ -74,7 +74,7 @@ pc-optim.sh (Bash MSYS / Git-Bash)
 
 | Catégorie | Cibles précises |
 |---|---|
-| **Disk** | `$env:USERPROFILE`, `C:\Windows\Temp`, `C:\Windows\SoftwareDistribution\Download`, `C:\Windows\Installer`, `C:\$Recycle.Bin`, `$env:TEMP`, `$env:LOCALAPPDATA\Temp`, archives `.zip/.rar/.7z/.iso` > 500 MB |
+| **Disk** | `$env:USERPROFILE`, `C:\Windows\Temp`, `C:\Windows\SoftwareDistribution\Download`, `C:\Windows\Installer`, `C:\$Recycle.Bin`, `$env:TEMP`, `$env:LOCALAPPDATA\Temp`, archives `.zip/.rar/.7z/.iso` > 500 MB, fichiers > 100 MB à la racine de `C:\` (`pagefile.sys`, `hiberfil.sys`), top 10 des sous-dossiers de `$env:LOCALAPPDATA\Temp`, détail `AppData` (`Local` / `LocalLow` / `Roaming` + top 10 de chacun) |
 | **AI models** | `$env:USERPROFILE\.ollama\models`, `$env:USERPROFILE\.cache\huggingface`, `$env:USERPROFILE\.lmstudio`, `$env:LOCALAPPDATA\nomic.ai\GPT4All`, `$env:USERPROFILE\stable-diffusion-webui\models`, `$env:USERPROFILE\ComfyUI\models` + fichiers `.gguf/.safetensors/.bin/.ckpt` > 1 GB |
 | **Dev caches** | `$env:LOCALAPPDATA\npm-cache` + `$env:APPDATA\npm-cache` (les deux testés), `$env:LOCALAPPDATA\pip\Cache`, `$env:LOCALAPPDATA\Yarn\Cache`, `$env:LOCALAPPDATA\pnpm`, `$env:USERPROFILE\.cargo`, `$env:USERPROFILE\.gradle`, `$env:USERPROFILE\.m2`, `$env:USERPROFILE\go`, `$env:APPDATA\Code\Cache*`, `$env:LOCALAPPDATA\JetBrains`, `docker system df --format json` ; si le daemon ne répond pas : taille de `$env:LOCALAPPDATA\Docker\wsl` (information, hors gain) |
 | **Duplicates** | `$env:USERPROFILE\Downloads`, `Documents`, `Desktop`, `Pictures`, `Videos` — fichiers > 10 MB groupés par `(Name, Length)` |
@@ -120,7 +120,7 @@ Article hub de référence : `D:/Google Drive/_WWW_/Julienweb.fr/content/article
 ```bash
 # Diagnostic complet (3-10 min)
 cd ~/diagnostics-pc/
-bash ~/.claude/skills/pc-optim/pc-optim.sh
+bash "D:/Google Drive/_Claude/skills/pc-optim/pc-optim.sh"
 
 # Sortie :
 #   ./pc-optim-out/_scan_*.json   (6 JSON + 6 logs)
@@ -130,9 +130,17 @@ bash ~/.claude/skills/pc-optim/pc-optim.sh
 Flags d'env (skip une phase, utile pour relancer un scan rapide après changement) :
 
 ```bash
-SKIP_DUP=1 SKIP_NET=1 bash ~/.claude/skills/pc-optim/pc-optim.sh
+SKIP_DUP=1 SKIP_NET=1 bash "D:/Google Drive/_Claude/skills/pc-optim/pc-optim.sh"
 # Scans       : SKIP_DISK, SKIP_AI, SKIP_DEV, SKIP_DUP, SKIP_APP, SKIP_NET
 # Post-rapport : SKIP_PDF (export PDF), SKIP_UPGRADE (winget), SKIP_OPEN (Explorer)
+```
+
+**C: plein** : lancer depuis un cwd **hors C:** (le rapport et `pc-optim-out/` s'écrivent dans le cwd) et
+avec `SKIP_UPGRADE=1` — `winget upgrade` télécharge et installe sur C:.
+
+```bash
+cd /d/diagnostics-pc/
+SKIP_UPGRADE=1 bash "D:/Google Drive/_Claude/skills/pc-optim/pc-optim.sh"
 ```
 
 Top N configurable par scan via `PC_OPTIM_TOPN=100` (défaut : 50).
@@ -167,6 +175,10 @@ signale en stderr au lieu de rendre un chiffre faux silencieusement.
 - **Durée scan doublons** : limitée volontairement aux 5 dossiers utilisateur principaux (pas tout `$env:USERPROFILE`) sinon 5+ min sur des Documents volumineux.
 - **Sous-comptage sur `AppData` (non résolu, 2026-08-31)** : `Get-ChildItem -Recurse` abandonne toute une branche au premier `AccessDenied` au lieu de continuer. Sur un profil chargé, `AppData` est ressorti à **28,9 GB** contre **82,3 GB** réels (14 refus, surtout `Local\Packages` UWP et `Local\Docker`). Sur un sous-arbre sans refus le helper est exact au byte près. **Recouper toute grosse valeur** avec `robocopy <dir> C:\__nx__ /L /S /NJH /BYTES /NC /NDL /XJ /R:0 /W:0`. Attention : robocopy compte les placeholders Drive/OneDrive à leur taille logique — il surestime là où `_Get-FolderSize` les exclut.
 - **Gain potentiel = 🟢 + 🟡 seulement.** Une zone 🔴 (`C:\Windows\Installer`) est listée en §1.3 mais n'entre jamais dans le gain. Les zones temp sont dédupliquées par chemin résolu : `$env:TEMP` et `$env:LOCALAPPDATA\Temp` sont le même dossier sur un Windows standard.
+- **Verdict aveugle au taux de remplissage (corrigé v1.2.0, run du 2026-10-04)** : sur un C: de 238,5 GB rempli à **99,9 %** (0,2 GB libres), le rapport concluait « Rien d'urgent à signaler » et §1 « 🟢 propre » pour 2,32 GB de gain — le score ne regardait que le gain identifié. Depuis : au-delà de `$DISK_FULL_PCT` (90 %, `_build_report.ps1`), §1 sort « 🔴 disque plein » et le Top 3 s'ouvre sur une alerte, quel que soit le gain.
+- **Gros postes hors champ (run du 2026-10-04)** : `C:\pagefile.sys` (17,2 GB) et `C:\hiberfil.sys` (6,4 GB) n'apparaissaient nulle part, `AppData` (69,27 GB) tenait en une ligne, et le Temp utilisateur n'était qu'un total — il contenait 4,5 GB de dossiers `remotion-webpack-bundle-*` (928 Mo pièce) et `remotion-v4.0.528-assets*` laissés par des rendus Remotion (skill `/create-video`). Depuis la v1.2.0 : §1.5 fichiers > 100 MB à la racine de C:, §1.6 top 10 de Temp, §1.7 `AppData` par niveau (`Local` / `LocalLow` / `Roaming`) + top 10. Le §1.7 re-mesure `AppData` : compter quelques minutes de plus, et le sous-comptage ci-dessus s'y applique aussi. `pagefile.sys` / `hiberfil.sys` restent **hors gain** (gérés par Windows).
+- **C: plein** : lancer avec `SKIP_UPGRADE=1` (`winget upgrade` écrit sur C:) et depuis un cwd hors C: — sorties et rapport s'écrivent dans le cwd. Voir §7.
+- **Tier workspace** : le skill vit dans `D:/Google Drive/_Claude/skills/pc-optim/`, pas dans `~/.claude/skills/`. Il est donc absent du listing système : le trigger `/pc-optim` n'existe que si le `CLAUDE.md` du workspace porte sa ligne dans le tableau « Skills workspace — trigger » (elle manquait jusqu'au 2026-10-05). Les chemins `~/.claude/skills/pc-optim/…` des §7 et §9 étaient faux pour la même raison.
 - **Admin** : non requis pour 90% des scans. Sans admin, certains `OwningProcess` n'exposent pas leur `Path` complet → le rapport affiche `?` à la place. `_Test-IsAdmin` warn en stderr si non-admin, scan continue dégradé.
 
 ---
@@ -180,7 +192,7 @@ Une variante utile : **baseline mensuelle** pour suivre l'évolution dans le tem
 ```bash
 # Run et archive avec timestamp dans un dossier dédié
 cd ~/diagnostics-pc/baseline/
-bash ~/.claude/skills/pc-optim/pc-optim.sh
+bash "D:/Google Drive/_Claude/skills/pc-optim/pc-optim.sh"
 # → pc-optim-2026-06-12.md gardé en historique
 # → diff manuel mois suivant : comparer Top dossiers et gains potentiels
 ```

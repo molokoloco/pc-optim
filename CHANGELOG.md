@@ -1,5 +1,40 @@
 # Changelog — pc-optim
 
+## v1.2.0 — 2026-10-05
+
+Constats du run du 2026-10-04, sur un C: de 238,5 GB rempli à **99,9 %** (0,2 GB libres) : le
+rapport concluait « Rien d'urgent à signaler », §1 « 🟢 propre », gain total 2,32 GB.
+
+### Corrigé
+
+- **Verdict aveugle au taux de remplissage.** Le score de §1 et le Top 3 ne dépendaient que du
+  gain identifié. Au-delà de `$DISK_FULL_PCT` (90 %, `_build_report.ps1`), §1 sort
+  « 🔴 disque plein » et le Top 3 s'ouvre sur une alerte ; « Rien d'urgent » n'est plus possible.
+- **Chemins du skill faux dans `SKILL.md` §7 et §9.** `~/.claude/skills/pc-optim/pc-optim.sh`
+  remplacé par l'emplacement réel, `D:/Google Drive/_Claude/skills/pc-optim/pc-optim.sh` (tier
+  workspace).
+
+### Ajouté
+
+- **§1.5 Fichiers > 100 MB à la racine de C:** (`Get-ChildItem C:\ -Force -File`) —
+  `pagefile.sys` (17,2 GB) et `hiberfil.sys` (6,4 GB) étaient invisibles. Listés hors gain.
+- **§1.6 Top 10 des sous-dossiers du Temp utilisateur.** Le total seul masquait 4,5 GB de
+  `remotion-webpack-bundle-*` (928 Mo pièce) et `remotion-v4.0.528-assets*` laissés par des rendus
+  Remotion.
+- **§1.7 Détail `AppData`** : `Local` / `LocalLow` / `Roaming`, puis top 10 de chacun (69,27 GB
+  tenaient en une ligne). Coût : `AppData` est mesuré une seconde fois ; la limite de
+  sous-comptage de la v1.1.0 s'y applique.
+- Champs `root_files`, `temp_top`, `appdata_detail` dans `_scan_disk_usage.json` ; paramètre
+  `-DetailTopN` (défaut 10) sur `scan_disk_usage.ps1`. Un JSON antérieur est rendu avec la
+  mention « scan antérieur à la v1.2.0 ».
+
+### Documenté
+
+- **C: plein** : lancer avec `SKIP_UPGRADE=1` (`winget upgrade` écrit sur C:) et depuis un cwd
+  hors C: (`SKILL.md` §7 et §8).
+- **Tier workspace** : `/pc-optim` manquait dans le tableau « Skills workspace — trigger » du
+  `CLAUDE.md` du workspace ; ligne ajoutée.
+
 ## v1.1.1 — 2026-09-21
 
 Défauts de chiffrage et de rendu relevés sur le run du 2026-09-21. Le gain « §1 Espace disque »
