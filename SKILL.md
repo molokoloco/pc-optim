@@ -1,6 +1,6 @@
 ---
 name: pc-optim
-version: 1.1.1
+version: 1.1.2
 description: Diagnostic read-only PC Windows — disk (C:\), modèles IA, caches dev, doublons, apps, réseau & sécurité. 6 scans PowerShell + rapport markdown. Mapping findings → outils Julien (SpaceSniffer/CCleaner/7-Zip/WingetUI/Memory Cleaner/OEM). Aucune écriture système. Trigger /pc-optim.
 trigger: /pc-optim
 allowed-tools: Read, Write, Bash, Grep, Glob

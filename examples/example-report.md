@@ -103,11 +103,11 @@
 
 | Risque | Zone | Chemin | Taille | Outil |
 |---|---|---|---|---|
-| 🟢 | Windows SoftwareDistribution | `C:\Windows\SoftwareDistribution\Download` | 256,2 MB | windows-builtin |
-| 🔴 | Windows Installer cache | `C:\Windows\Installer` | 1,17 GB | manual |
-| 🟢 | User Temp | `C:\Users\demo\AppData\Local\Temp` | 609,3 MB | ccleaner |
-| 🟢 | LocalAppData Temp | `C:\Users\demo\AppData\Local\Temp` | 609,3 MB | ccleaner |
-| 🟢 | Recycle Bin | `C:\$Recycle.Bin` | 129 B | windows-builtin |
+| 🟢 | Windows SoftwareDistribution | `C:\Windows\SoftwareDistribution\Download` | 256,2 MB | Nettoyage de disque + Storage Sense (Assistant de stockage) |
+| 🔴 | Windows Installer cache | `C:\Windows\Installer` | 1,17 GB | Action manuelle (Explorer / Settings) |
+| 🟢 | User Temp | `C:\Users\demo\AppData\Local\Temp` | 609,3 MB | CCleaner |
+| 🟢 | LocalAppData Temp | `C:\Users\demo\AppData\Local\Temp` | 609,3 MB | CCleaner |
+| 🟢 | Recycle Bin | `C:\$Recycle.Bin` | 129 B | Nettoyage de disque + Storage Sense (Assistant de stockage) |
 
 ### 1.4 Archives volumineuses (> 500 MB)
 
@@ -287,12 +287,12 @@ Param�tres de proxy WinHTTP actuels�:
 
 | Finding | Risque | Gain | Outil | Action |
 |---|---|---|---|---|
-| Temp système & cache Windows | 🟢 | ~2.61 GB | windows-builtin | Paramètres → Système → Stockage → Fichiers temporaires |
-| Archives lourdes (1) | 🟡 | ~0.82 GB | 7zip | Trier .zip/.rar/.iso dans Downloads |
-| Modèles IA (2 provider) | 🟡 | ~12.5 GB | ollama-cli | `ollama list` puis `ollama rm` les inutiles |
+| Temp système & cache Windows | 🟢 | ~2.61 GB | Nettoyage de disque + Storage Sense (Assistant de stockage) | Paramètres → Système → Stockage → Fichiers temporaires |
+| Archives lourdes (1) | 🟡 | ~0.82 GB | 7-Zip | Trier .zip/.rar/.iso dans Downloads |
+| Modèles IA (2 provider) | 🟡 | ~12.5 GB | Ollama CLI | `ollama list` puis `ollama rm` les inutiles |
 | Caches dev | 🟢 | ~0.96 GB | CLI dédié | `npm cache clean --force` / `docker system prune -a --volumes` |
-| RAM saturée après build/VM | 🟢 | n/a | memorycleaner | Lancer Windows Memory Cleaner |
-| Pilotes / BIOS obsolètes | 🟢 | n/a | oem | Lancer l'utilitaire fabricant |
+| RAM saturée après build/VM | 🟢 | n/a | Windows Memory Cleaner | Lancer Windows Memory Cleaner |
+| Pilotes / BIOS obsolètes | 🟢 | n/a | Utilitaire fabricant (Dell SupportAssist / HP / Lenovo Vantage / MyASUS / Acer Care / MSI Dragon Center / Razer Synapse / Surface Uptime) | Lancer l'utilitaire fabricant |
 
 ---
 

@@ -9,7 +9,7 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
-$SKILL_VERSION = '1.1.1'
+$SKILL_VERSION = '1.1.2'
 
 # --- Helpers locaux ---
 function Load-Json {
