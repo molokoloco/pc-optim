@@ -66,8 +66,8 @@ function Get-Items {
 function Get-ToolName {
     param([string]$Hint)
     if (-not $Hint) { return '—' }
-    if ($mapping.tools.PSObject.Properties.Name -contains $Hint) {
-        return $mapping.tools.$Hint.name
+    if ($toolMap.tools.PSObject.Properties.Name -contains $Hint) {
+        return $toolMap.tools.$Hint.name
     }
     return $Hint
 }
@@ -82,7 +82,8 @@ $apps = Load-Json 'scan_apps_installed'
 $net  = Load-Json 'scan_network_security'
 
 $mappingRaw = Get-Content -LiteralPath $Mapping -Raw -Encoding UTF8
-$mapping = $mappingRaw | ConvertFrom-Json
+# Pas `$mapping` : PowerShell ignore la casse, ce serait le paramètre [string]$Mapping (objet aplati en chaîne)
+$toolMap = $mappingRaw | ConvertFrom-Json
 
 # --- Listes normalisées (jamais d'objet vide) ---
 $diskArchives  = @(if ($disk) { Get-Items $disk.archives })

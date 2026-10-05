@@ -25,6 +25,10 @@ annonçait **8,03 GB** pour **3,4 GB** réellement récupérables.
   sérialise en `{}`, relu comme un objet sans propriété → ligne `| (vide) |  | ⚪ |`. Les scans
   émettent des tableaux (`@(...)`) et le builder filtre les objets vides (`Get-Items`) : le
   message « _(aucun…)_ » prévu s'affiche.
+- **Noms d'outils jamais résolus (colonne « Outil »).** Le builder rangeait le mapping parsé dans
+  `$mapping`, soit le paramètre `[string]$Mapping` (PowerShell ignore la casse) : l'objet JSON
+  redevenait une chaîne et `Get-ToolName` renvoyait la clé brute (`memorycleaner`, `oem`…).
+  L'objet vit désormais dans `$toolMap` ; le rapport affiche le champ `name` de `tools-mapping.json`.
 
 ## v1.1.0 — 2026-08-31
 
